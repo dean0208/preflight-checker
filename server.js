@@ -2,11 +2,24 @@ const express = require('express');
 const cors = require('cors');
 const { execFile } = require('child_process');
 const path = require('path');
+const net = require('net');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// 빈 포트 자동 탐색
+function findFreePort(start = 3000) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(start, () => {
+      const port = server.address().port;
+      server.close(() => resolve(port));
+    });
+    server.on('error', () => resolve(findFreePort(start + 1)));
+  });
+}
 
 // Claude Code CLI로 AI 호출 (회사 엔터프라이즈 계정 인증 그대로 사용, 비용 없음)
 // 로그인 쉘로 실행해서 각자 PC의 PATH에서 claude를 찾음
@@ -200,9 +213,17 @@ ${answersText}
   }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`\n✅ 기획서 점검 도구 실행 중`);
-  console.log(`👉 http://localhost:${PORT}`);
-  console.log(`\n📌 Claude Code 엔터프라이즈 계정으로 실행됩니다 (비용 없음)\n`);
+const { execSync } = require('child_process');
+
+findFreePort(3000).then(PORT => {
+  app.listen(PORT, () => {
+    console.log(`\n✅ 기획서 점검 도구 실행 중`);
+    console.log(`👉 http://localhost:${PORT}`);
+    console.log(`\n📌 Claude Code 엔터프라이즈 계정으로 실행됩니다 (비용 없음)\n`);
+
+    // 브라우저 자동 오픈
+    try {
+      execSync(`open http://localhost:${PORT}`);
+    } catch (_) {}
+  });
 });
