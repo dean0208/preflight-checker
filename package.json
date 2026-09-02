@@ -4,7 +4,8 @@
   "description": "기획서 사전 점검 도구",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "restart": "pkill -f 'preflight-checker/server.js' 2>/dev/null || true; node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

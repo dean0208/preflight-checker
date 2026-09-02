@@ -12,11 +12,15 @@ git clone https://github.com/dean0208/preflight-checker.git ~/preflight-checker 
 
 ---
 
-## 실행
+## 업데이트·재시작
+
+이미 실행한 적이 있으면 이전 서버가 남아 있을 수 있습니다. 아래 명령은 **기존 기획서 점검 도구 서버만 종료**한 뒤 최신 코드로 다시 실행합니다.
 
 ```bash
-cd ~/preflight-checker && git pull && npm start
+cd ~/preflight-checker && git pull && npm run restart
 ```
+
+오류 메시지에 다른 사람의 경로(예: `/Users/dean/...`)가 보이면 반드시 위 명령으로 재시작하세요.
 
 3000번 포트를 다른 앱이 쓰고 있으면 3001, 3002 등 빈 포트를 자동으로 찾아 브라우저를 엽니다.
 
