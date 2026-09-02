@@ -9,10 +9,22 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Claude Code CLI로 AI 호출 (회사 엔터프라이즈 계정 인증 그대로 사용, 비용 없음)
+// claude 경로: ~/.local/bin/claude (PATH 미인식 환경 대비 절대경로 우선 탐색)
+const os = require('os');
+const CLAUDE_PATH = [
+  `${os.homedir()}/.local/bin/claude`,
+  `${os.homedir()}/.local/share/claude/claude`,
+  '/usr/local/bin/claude',
+  '/opt/homebrew/bin/claude',
+  'claude', // 마지막 fallback
+].find(p => {
+  try { require('child_process').execFileSync(p, ['--version'], { timeout: 3000 }); return true; } catch { return false; }
+}) || 'claude';
+
 function callClaude(prompt) {
   return new Promise((resolve, reject) => {
     const child = execFile(
-      'claude',
+      CLAUDE_PATH,
       ['-p', '--output-format', 'text'],
       { timeout: 120000, maxBuffer: 1024 * 1024 * 10 },
       (err, stdout, stderr) => {
