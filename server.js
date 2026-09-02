@@ -44,7 +44,11 @@ function callClaude(prompt) {
 
     child.on('close', code => {
       if (code !== 0) {
-        const msg = stderr || '';
+        const msg = `${stderr}\n${stdout}`.trim();
+        if (msg.includes('session limit') || msg.includes('rate limit') || msg.includes('usage limit')) {
+          const reset = msg.match(/resets\s+([^\n]+)/i)?.[1];
+          return reject(new Error(`Claude Code 사용 한도에 도달했습니다.${reset ? ` 초기화: ${reset}` : ''} 한도 초기화 후 다시 시도해주세요.`));
+        }
         if (msg.includes('authenticate') || msg.includes('OAuth') || msg.includes('expired') || msg.includes('login')) {
           return reject(new Error('Claude Code 로그인이 필요합니다. 터미널에서 claude auth login 을 실행해주세요.'));
         }
