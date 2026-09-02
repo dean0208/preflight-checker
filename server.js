@@ -33,7 +33,7 @@ function callClaude(prompt) {
     // 로그인 쉘(-l)로 실행 → 각자 PC의 ~/.zshrc, ~/.bashrc 등 PATH 적용
     const child = spawn(
       '/bin/bash',
-      ['-l', '-c', 'claude -p --output-format text'],
+      ['-l', '-c', 'claude -p --output-format text --no-session-persistence --setting-sources user'],
       { timeout: 120000 }
     );
 
