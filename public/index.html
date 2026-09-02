@@ -195,34 +195,17 @@
       <div class="models-grid" id="models-grid"></div>
     </div>
 
-    <button class="btn btn-primary" id="go-complete-btn">보완 항목 입력하고 완성본 받기 →</button>
+    <button class="btn btn-primary" id="generate-btn" onclick="generateAgentPrompt()">복사할 개발 프롬프트 만들기 →</button>
     <button class="btn btn-secondary" onclick="restart()">다른 기획서 분석하기</button>
   </div>
 
-  <!-- 4. 보완 입력 -->
-  <div id="complete-section">
-    <div class="form-box">
-      <h2>✏️ 빠진 항목을 채워주세요</h2>
-      <p class="desc">아래 질문들에 간단히 답하면 완성된 기획서 MD를 만들어드려요</p>
-      <div id="missing-fields"></div>
-      <button class="btn btn-primary" id="generate-btn" onclick="generateComplete()">완성본 기획서 + 프롬프트 생성하기 →</button>
-      <button class="btn btn-secondary" onclick="showResult()">← 분석 결과로 돌아가기</button>
-    </div>
-  </div>
-
-  <!-- 5. 완성본 출력 -->
+  <!-- 4. 복붙 전용 개발 프롬프트 -->
   <div id="output-section">
     <div class="output-box">
-      <button class="copy-btn" onclick="copyText('md-preview')">복사</button>
-      <h3>📄 완성된 기획서</h3>
-      <pre class="md-preview" id="md-preview"></pre>
-      <button class="btn btn-primary" style="margin-top:16px" onclick="downloadMD()">MD 파일 다운로드</button>
-    </div>
-
-    <div class="output-box">
-      <button class="copy-btn" onclick="copyText('prompt-preview')">복사</button>
-      <h3>🤖 AI 에이전트용 프롬프트</h3>
-      <div class="prompt-preview" id="prompt-preview"></div>
+      <h3>🤖 AI 코딩 에이전트에 그대로 붙여넣으세요</h3>
+      <p style="font-size:13px;color:#666;line-height:1.6;margin-bottom:16px">아래 프롬프트는 진단 결과를 반영해 완성된 상태입니다. 수정 없이 복사해서 Claude Code 또는 Codex에 붙여넣으면 됩니다. 위에 표시된 추천 모델만 직접 선택하세요.</p>
+      <button class="btn btn-primary" id="copy-agent-prompt-btn" onclick="copyAgentPrompt()">프롬프트 전체 복사하기</button>
+      <pre class="md-preview" id="prompt-preview" style="margin-top:16px"></pre>
     </div>
 
     <div class="restart-btn">
@@ -235,7 +218,6 @@
 <script>
 let analysisResult = null;
 let originalContent = '';
-let completedMD = '';
 
 const sectionMeta = {
   purpose:       { icon: '🎯' },
@@ -392,83 +374,48 @@ function renderResult(data) {
 }
 
 // ─── 보완 입력 ──────────────────────────────────
-document.getElementById('go-complete-btn').addEventListener('click', () => {
-  const missing = (analysisResult?.sections || []).filter(s => s.status !== 'good');
-  const container = document.getElementById('missing-fields');
-  container.innerHTML = '';
-
-  if (missing.length === 0) {
-    container.innerHTML = '<p style="color:#34c759;font-weight:600;margin-bottom:20px">✅ 모든 항목이 양호합니다! 바로 완성본을 생성할게요.</p>';
-  } else {
-    missing.forEach(sec => {
-      const meta = sectionMeta[sec.id] || { icon: '📌' };
-      const hasAiAnswer = sec.ai_answer && sec.ai_answer.trim();
-      container.innerHTML += `
-        <div class="form-field">
-          <label>${meta.icon} ${sec.name}</label>
-          ${sec.question ? `<div class="question">👉 ${sec.question}</div>` : ''}
-          ${hasAiAnswer ? `<div class="ai-answer-hint">🤖 <span>AI 추천 답변이 입력됐어요 — 그대로 제출하거나 직접 수정하세요</span></div>` : ''}
-          <textarea id="answer-${sec.id}">${hasAiAnswer ? sec.ai_answer : ''}</textarea>
-        </div>`;
-    });
-  }
-  show('complete-section');
-});
-
-// ─── 모달 제어 ────────────────────────────────────
+// ─── 복붙 전용 프롬프트 생성 ───────────────────────
 const loadingModal = document.getElementById('loading-modal');
-const modalTitle   = document.getElementById('modal-title');
-const modalStep    = document.getElementById('modal-step');
+const modalTitle = document.getElementById('modal-title');
+const modalStep = document.getElementById('modal-step');
 
 function showModal(title, step) {
   modalTitle.textContent = title;
-  modalStep.textContent  = step;
+  modalStep.textContent = step;
   loadingModal.classList.add('active');
 }
-function updateModalStep(step) {
-  modalStep.textContent = step;
-}
-function hideModal() {
-  loadingModal.classList.remove('active');
-}
+function updateModalStep(step) { modalStep.textContent = step; }
+function hideModal() { loadingModal.classList.remove('active'); }
 
-async function generateComplete() {
+async function generateAgentPrompt() {
   const btn = document.getElementById('generate-btn');
   btn.disabled = true;
-
   const steps = [
-    '기획서 내용을 분석하고 있어요...',
-    '누락된 항목을 보완하고 있어요...',
-    '에이전트 프롬프트를 작성하고 있어요...',
-    '마무리 중이에요...'
+    '진단 결과를 개발 요구사항으로 정리하고 있어요...',
+    '활용처에 맞는 최소 설계를 결정하고 있어요...',
+    '바로 실행 가능한 개발 지시문을 작성하고 있어요...',
+    '복사할 프롬프트를 마무리하고 있어요...'
   ];
   let stepIdx = 0;
-  showModal('완성본 생성 중...', steps[0]);
+  showModal('개발 프롬프트 생성 중...', steps[0]);
   const stepTimer = setInterval(() => {
     stepIdx = (stepIdx + 1) % steps.length;
     updateModalStep(steps[stepIdx]);
   }, 4000);
 
-  const answers = {};
-  (analysisResult?.sections || []).filter(s => s.status !== 'good').forEach(sec => {
-    const el = document.getElementById('answer-' + sec.id);
-    if (el && el.value.trim()) answers[sec.name] = el.value.trim();
-  });
-
   try {
     const res = await fetch('/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ original_content: originalContent, answers, analysis: analysisResult })
+      body: JSON.stringify({ original_content: originalContent, analysis: analysisResult })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    completedMD = data.completed_md;
-    document.getElementById('md-preview').textContent = completedMD;
+    if (!data.agent_prompt) throw new Error('생성된 개발 프롬프트가 비어 있습니다.');
     document.getElementById('prompt-preview').textContent = data.agent_prompt;
     show('output-section');
   } catch (err) {
-    alert('생성 오류: ' + err.message);
+    alert('프롬프트 생성 오류: ' + err.message);
   } finally {
     clearInterval(stepTimer);
     hideModal();
@@ -476,40 +423,33 @@ async function generateComplete() {
   }
 }
 
-// ─── 다운로드 ────────────────────────────────────
-function downloadMD() {
-  if (!completedMD) { alert('먼저 완성본을 생성해주세요.'); return; }
-  const blob = new Blob([completedMD], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = '완성된_기획서.md';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function copyText(id) {
-  const el = document.getElementById(id);
-  navigator.clipboard.writeText(el.textContent).then(() => alert('복사했습니다!'));
+async function copyAgentPrompt() {
+  const text = document.getElementById('prompt-preview').textContent.trim();
+  if (!text) return alert('먼저 개발 프롬프트를 생성해주세요.');
+  try {
+    await navigator.clipboard.writeText(text);
+    const button = document.getElementById('copy-agent-prompt-btn');
+    const original = button.textContent;
+    button.textContent = '✅ 복사했습니다 — AI 에이전트에 붙여넣으세요';
+    setTimeout(() => { button.textContent = original; }, 2500);
+  } catch (_) {
+    alert('복사에 실패했습니다. 프롬프트 영역을 직접 선택해서 복사해주세요.');
+  }
 }
 
 // ─── 유틸 ────────────────────────────────────────
 function show(id) {
-  ['upload-section','loading-section','result-section','complete-section','output-section']
+  ['upload-section', 'loading-section', 'result-section', 'output-section']
     .forEach(s => document.getElementById(s).style.display = s === id ? 'block' : 'none');
 }
-
-function showResult() { show('result-section'); }
 
 function restart() {
   analysisResult = null;
   originalContent = '';
-  completedMD = '';
   document.getElementById('file-input').value = '';
   document.querySelectorAll('#loading-steps li').forEach(li => li.className = '');
   document.getElementById('risks-box').style.display = 'none';
+  document.getElementById('prompt-preview').textContent = '';
   show('upload-section');
 }
 </script>

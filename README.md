@@ -1,6 +1,6 @@
 # 기획서 사전 점검 도구
 
-MD 파일 업로드 → AI 자동 분석 → 완성본 기획서 + 에이전트 프롬프트 생성
+MD 파일 업로드 → AI 자동 진단 → 완성형 개발 프롬프트 복사
 
 ---
 
@@ -10,33 +10,37 @@ MD 파일 업로드 → AI 자동 분석 → 완성본 기획서 + 에이전트 
 git clone https://github.com/dean0208/preflight-checker.git ~/preflight-checker && cd ~/preflight-checker && npm install && npm start
 ```
 
-브라우저가 자동으로 열립니다.
-
 ---
 
-## 두 번째부터
+## 실행
 
-`~/preflight-checker` 폴더에서 `기획서점검도구.command` 더블클릭
+```bash
+cd ~/preflight-checker && git pull && npm start
+```
+
+3000번 포트를 다른 앱이 쓰고 있으면 3001, 3002 등 빈 포트를 자동으로 찾아 브라우저를 엽니다.
 
 ---
 
 ## 사전 조건
 
-- Node.js 설치 (없으면 https://nodejs.org 에서 설치)
-- Claude Code 회사 계정 로그인 필요
-  - 확인: 터미널에서 `echo "테스트" | claude -p` 실행 시 응답 오면 OK
-  - 안 되면: `claude auth login` 실행 후 로그인
+- Node.js 설치
+- Claude Code 회사 계정 로그인
+  - 확인: `echo "테스트" | claude -p` 실행 후 응답 확인
+  - 로그인 필요: `claude auth login`
 
 ---
 
-## 사용 방법
+## 사용 흐름
 
-1. MD 기획서 파일 드래그앤드롭
-2. AI가 활용처 자동 판단 + 6개 항목 점검
-3. 진단 결과 확인 (과도한 설계 / 부족한 설계 경고 포함)
-4. 보완 항목 — AI 추천 답변 미리 입력됨 (그대로 제출 or 수정)
-5. 완성된 기획서 MD 다운로드 + 에이전트 프롬프트 복사
+1. MD 기획서 파일을 올립니다.
+2. AI가 활용처를 개인 / 팀 / 전사 / 행사 / 외부 서비스로 판별하고, 그 규모에 맞춰 과도하거나 부족한 설계를 진단합니다.
+3. 추천 Claude / OpenAI 모델을 확인하고, 실제 사용할 AI 에이전트에서 해당 모델을 직접 선택합니다.
+4. **복사할 개발 프롬프트 만들기**를 누릅니다.
+5. 생성된 프롬프트 전체를 복사하여 Claude Code 또는 Codex에 그대로 붙여넣습니다.
+
+사용자가 보완 항목을 입력하거나 MD 파일을 내려받을 필요가 없습니다. 프롬프트에는 기획서 원문과 자동 보완된 최소 설계, 구현·검증 지시가 모두 포함됩니다.
 
 ---
 
-API 키 불필요 — 회사 Claude Code 엔터프라이즈 계정 자동 사용
+API 키 불필요 — 회사 Claude Code 엔터프라이즈 계정을 사용합니다.

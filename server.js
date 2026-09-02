@@ -173,51 +173,45 @@ ${content}`;
   }
 });
 
-// ── 완성본 MD + 에이전트 프롬프트 생성 ───────────────────────
+// ── 복붙 전용 AI 개발 프롬프트 생성 ─────────────────────────
 app.post('/complete', async (req, res) => {
-  const { original_content, answers, analysis } = req.body;
+  const { original_content, analysis } = req.body;
+  const recommended = analysis?.recommended_models || {};
 
-  const answersText = Object.entries(answers || {})
-    .map(([k, v]) => `- ${k}: ${v}`)
-    .join('\n') || '(추가 답변 없음)';
+  const prompt = `당신은 비개발자가 AI 코딩 에이전트에게 바로 붙여넣을 개발 지시문을 작성하는 전문가입니다.
+원본 기획서와 진단 결과를 반영해, 사용자가 수정 없이 그대로 복사해 Claude Code나 Codex에 붙여넣을 수 있는 "완성형 개발 프롬프트" 하나를 작성하세요.
 
-  // MD와 프롬프트를 구분자로 나눠서 받음 (JSON 이스케이프 문제 방지)
-  const prompt = `당신은 소프트웨어 기획서 작성 전문가입니다.
-아래 원본 기획서와 추가 답변을 합쳐서 두 가지를 작성하세요.
-반드시 아래 형식 그대로 출력하세요. ===SPLIT=== 구분자는 반드시 포함하세요.
-
-[완성된 기획서 MD]
-(여기에 완성된 기획서를 MD 형식으로 작성. 원본 내용 최대한 유지하고 누락 항목 보완)
-===SPLIT===
-[에이전트 프롬프트]
-(여기에 AI 코딩 에이전트용 지시 프롬프트 5~7문장. "아래 정의서를 기반으로..." 로 시작. 순수 텍스트)
+필수 규칙:
+- 순수 텍스트 또는 Markdown으로만 작성하고, 인사말/해설은 넣지 마세요.
+- "아래 정의서를 기반으로"로 시작하세요.
+- 원본 기획의 의도는 유지하되, 진단에서 발견한 누락·리스크는 활용처에 맞는 최소 설계로 이미 결정해서 반영하세요. 사용자에게 추가 질문하지 마세요.
+- 활용처가 personal 또는 event이면 유료 인프라, 로그인, 복잡한 DB, 과도한 보안·운영 설계를 강요하지 마세요.
+- 활용처가 team/company/product면 필요한 인증·백업·권한·보안 요구사항을 빠뜨리지 마세요.
+- 반드시 포함: 목적과 사용자 / 선택할 기술 스택 / 구현할 핵심 기능 / 데이터 및 배포 방식 / 완료·검증 기준 / 하지 말아야 할 과도한 설계.
+- 구현자는 먼저 프로젝트 구조와 현재 파일을 점검하고, 구현 후 실제 실행·테스트까지 완료해야 한다고 명시하세요.
+- 모델은 사용자가 UI에서 직접 선택하므로, 특정 모델 사용을 지시하지 마세요.
 
 [원본 기획서]
 ${original_content}
 
-[추가 답변]
-${answersText}
+[자동 진단 결과]
+활용처: ${analysis?.usage_type_label || ''}
+배포 유형: ${analysis?.deploy_type_label || ''}
+적정 볼륨: ${analysis?.volume_guide || ''}
+주요 리스크: ${(analysis?.risks || []).join(', ')}
+세부 점검: ${(analysis?.sections || []).map(s => `${s.name}: ${s.status} - ${s.suggestion || s.message || ''}`).join('\n')}
 
-[분석 메모]
-배포유형: ${analysis?.deploy_type_label || ''}
-리스크: ${(analysis?.risks || []).join(', ')}`;
+[UI에 별도 표시할 모델 추천]
+Claude: ${recommended.claude?.model || ''} (${recommended.claude?.reason || ''})
+OpenAI: ${recommended.openai?.model || ''} (${recommended.openai?.reason || ''})`;
 
   try {
-    const text = await callClaude(prompt);
-    const parts = text.split('===SPLIT===');
-    if (parts.length < 2) throw new Error('응답 형식이 올바르지 않습니다.');
-
-    const completedMD = parts[0]
-      .replace(/^\[완성된 기획서 MD\]\s*/i, '')
-      .trim();
-    const agentPrompt = parts[1]
-      .replace(/^\[에이전트 프롬프트\]\s*/i, '')
-      .trim();
-
-    res.json({ completed_md: completedMD, agent_prompt: agentPrompt });
+    const agentPrompt = await callClaude(prompt);
+    if (!agentPrompt) throw new Error('생성된 프롬프트가 비어 있습니다.');
+    res.json({ agent_prompt: agentPrompt });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: '완성본 생성 오류: ' + err.message });
+    res.status(500).json({ error: '프롬프트 생성 오류: ' + err.message });
   }
 });
 
