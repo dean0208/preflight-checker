@@ -16,11 +16,16 @@ function callClaude(prompt) {
       ['-p', '--output-format', 'text'],
       { timeout: 120000, maxBuffer: 1024 * 1024 * 10 },
       (err, stdout, stderr) => {
-        if (err) return reject(new Error(stderr || err.message));
+        if (err) {
+          const msg = stderr || err.message || '';
+          if (msg.includes('authenticate') || msg.includes('OAuth') || msg.includes('expired')) {
+            return reject(new Error('Claude Code 로그인이 필요합니다. 터미널에서 claude 를 실행해서 회사 계정으로 로그인해주세요.'));
+          }
+          return reject(new Error(msg || err.message));
+        }
         resolve(stdout.trim());
       }
     );
-    // stdin으로 프롬프트 전달 (인자 길이 제한 없음)
     child.stdin.write(prompt, 'utf8');
     child.stdin.end();
   });
