@@ -434,11 +434,16 @@ async function generateComplete() {
 
 // ─── 다운로드 ────────────────────────────────────
 function downloadMD() {
-  const blob = new Blob([completedMD], { type: 'text/markdown' });
+  if (!completedMD) { alert('먼저 완성본을 생성해주세요.'); return; }
+  const blob = new Blob([completedMD], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = '완성된_기획서.md';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function copyText(id) {

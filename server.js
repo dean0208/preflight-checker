@@ -181,18 +181,16 @@ app.post('/complete', async (req, res) => {
     .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n') || '(추가 답변 없음)';
 
+  // MD와 프롬프트를 구분자로 나눠서 받음 (JSON 이스케이프 문제 방지)
   const prompt = `당신은 소프트웨어 기획서 작성 전문가입니다.
-아래 원본 기획서와 추가 답변을 합쳐서 두 가지를 JSON으로 출력하세요.
-JSON 외 다른 텍스트는 절대 출력하지 마세요.
+아래 원본 기획서와 추가 답변을 합쳐서 두 가지를 작성하세요.
+반드시 아래 형식 그대로 출력하세요. ===SPLIT=== 구분자는 반드시 포함하세요.
 
-{
-  "completed_md": "완성된 기획서 전체 (순수 MD 형식, 개발자가 바로 참고할 수 있게 구체적으로)",
-  "agent_prompt": "AI 코딩 에이전트용 지시 프롬프트 (5~7문장, 아래 정의서를 기반으로... 로 시작, 기술스택/핵심기능/완료기준 포함, 순수 텍스트)"
-}
-
-규칙:
-- completed_md: 원본 내용 최대한 유지, 누락 항목 자연스럽게 보완, 순수 MD
-- agent_prompt: 마크다운 없이 순수 텍스트 5~7문장
+[완성된 기획서 MD]
+(여기에 완성된 기획서를 MD 형식으로 작성. 원본 내용 최대한 유지하고 누락 항목 보완)
+===SPLIT===
+[에이전트 프롬프트]
+(여기에 AI 코딩 에이전트용 지시 프롬프트 5~7문장. "아래 정의서를 기반으로..." 로 시작. 순수 텍스트)
 
 [원본 기획서]
 ${original_content}
@@ -206,11 +204,17 @@ ${answersText}
 
   try {
     const text = await callClaude(prompt);
-    const result = extractJSON(text);
-    res.json({
-      completed_md: result.completed_md || '',
-      agent_prompt: result.agent_prompt || ''
-    });
+    const parts = text.split('===SPLIT===');
+    if (parts.length < 2) throw new Error('응답 형식이 올바르지 않습니다.');
+
+    const completedMD = parts[0]
+      .replace(/^\[완성된 기획서 MD\]\s*/i, '')
+      .trim();
+    const agentPrompt = parts[1]
+      .replace(/^\[에이전트 프롬프트\]\s*/i, '')
+      .trim();
+
+    res.json({ completed_md: completedMD, agent_prompt: agentPrompt });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '완성본 생성 오류: ' + err.message });
