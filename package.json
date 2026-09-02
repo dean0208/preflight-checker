@@ -1,0 +1,14 @@
+{
+  "name": "preflight-checker",
+  "version": "1.0.0",
+  "description": "기획서 사전 점검 도구",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}

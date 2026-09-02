@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기획서 사전 점검 도구</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
+
+  .header { background: #fff; border-bottom: 1px solid #e5e5e5; padding: 20px 40px; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .badge { background: #f0f0f0; padding: 4px 10px; border-radius: 20px; font-size: 12px; color: #666; }
+
+  .main { max-width: 800px; margin: 60px auto; padding: 0 24px; }
+
+  /* 업로드 화면 */
+  #upload-section { text-align: center; }
+  #upload-section h2 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
+  #upload-section p { color: #666; margin-bottom: 40px; font-size: 16px; }
+  .drop-zone { border: 2px dashed #d0d0d0; border-radius: 16px; padding: 60px 40px; cursor: pointer; transition: all 0.2s; background: #fff; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #0071e3; background: #f0f7ff; }
+  .drop-zone .icon { font-size: 48px; margin-bottom: 16px; }
+  .drop-zone .main-text { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .drop-zone .sub-text { color: #888; font-size: 14px; }
+  #file-input { display: none; }
+
+  /* 로딩 */
+  #loading-section { display: none; text-align: center; padding: 80px 0; }
+  .spinner { width: 48px; height: 48px; border: 4px solid #e5e5e5; border-top-color: #0071e3; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 24px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-steps { list-style: none; text-align: left; display: inline-block; margin-top: 24px; }
+  .loading-steps li { padding: 6px 0; color: #999; font-size: 14px; transition: color 0.3s; }
+  .loading-steps li.active { color: #0071e3; font-weight: 600; }
+  .loading-steps li.done { color: #34c759; }
+
+  /* 결과 화면 */
+  #result-section { display: none; }
+  .result-header { background: #fff; border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .deploy-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 6px; margin-right: 6px; }
+  .usage-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .usage-personal { background: #e8f5e9; color: #2e7d32; }
+  .usage-team     { background: #e3f2fd; color: #1565c0; }
+  .usage-company  { background: #ede7f6; color: #4527a0; }
+  .usage-event    { background: #fff3e0; color: #e65100; }
+  .usage-product  { background: #fce4ec; color: #c62828; }
+  .deploy-local { background: #f0f0f0; color: #555; }
+  .deploy-internal { background: #e3f2fd; color: #1565c0; }
+  .deploy-public { background: #fce4ec; color: #c62828; }
+  .volume-guide { background: #fffde7; border-left: 4px solid #f9a825; border-radius: 0 12px 12px 0; padding: 14px 18px; margin-top: 14px; font-size: 13px; color: #555; line-height: 1.6; }
+  .volume-guide-title { font-size: 12px; font-weight: 700; color: #f9a825; margin-bottom: 6px; }
+  .result-summary-row { display: flex; align-items: center; justify-content: space-between; }
+  .result-summary { font-size: 16px; color: #444; flex: 1; margin-right: 24px; }
+  .score-circle { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; flex-shrink: 0; font-weight: 700; font-size: 20px; }
+  .score-high { background: #e8f5e9; color: #2e7d32; }
+  .score-mid { background: #fff8e1; color: #f57f17; }
+  .score-low { background: #ffebee; color: #c62828; }
+  .score-label { font-size: 10px; font-weight: 400; margin-top: 2px; }
+
+  .sections-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  .section-card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid transparent; }
+  .section-card.good { border-left-color: #34c759; }
+  .section-card.warning { border-left-color: #ff9500; }
+  .section-card.missing { border-left-color: #ff3b30; }
+  .section-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .section-icon { font-size: 16px; }
+  .section-name { font-weight: 600; font-size: 14px; }
+  .section-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; margin-left: auto; }
+  .good .section-status { background: #e8f5e9; color: #2e7d32; }
+  .warning .section-status { background: #fff8e1; color: #f57f17; }
+  .missing .section-status { background: #ffebee; color: #c62828; }
+  .section-message { font-size: 13px; color: #555; margin-bottom: 6px; }
+  .section-suggestion { font-size: 12px; color: #0071e3; }
+
+  .risks-box { background: #fff8e1; border-radius: 14px; padding: 20px 24px; margin-bottom: 20px; }
+  .risks-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #b45309; }
+  .risks-box ul { list-style: none; }
+  .risks-box li { font-size: 13px; color: #555; padding: 4px 0; padding-left: 16px; position: relative; }
+  .risks-box li::before { content: '⚠'; position: absolute; left: 0; }
+
+  .models-box { background: #fff; border-radius: 14px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .models-box h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+  .models-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .model-card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 16px; }
+  .model-provider { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 6px; }
+  .model-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .model-reason { font-size: 12px; color: #555; line-height: 1.5; }
+
+  /* 보완 입력 폼 */
+  #complete-section { display: none; }
+  .form-box { background: #fff; border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .form-box h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .form-box .desc { color: #666; font-size: 14px; margin-bottom: 24px; }
+  .form-field { margin-bottom: 20px; }
+  .form-field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .form-field .question { font-size: 13px; color: #666; margin-bottom: 8px; }
+  .form-field textarea { width: 100%; border: 1px solid #d0d0d0; border-radius: 10px; padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 80px; outline: none; transition: border-color 0.2s; }
+  .form-field textarea:focus { border-color: #0071e3; }
+  .ai-answer-hint { font-size: 11px; color: #0071e3; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+  .ai-answer-hint span { background: #e8f0fe; padding: 2px 8px; border-radius: 10px; }
+
+  /* 버튼 */
+  .btn { display: inline-block; padding: 14px 28px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn-primary { background: #0071e3; color: #fff; width: 100%; text-align: center; }
+  .btn-primary:hover { background: #0077ed; }
+  .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+  .btn-secondary { background: #f0f0f0; color: #1d1d1f; margin-top: 12px; width: 100%; text-align: center; }
+  .btn-secondary:hover { background: #e5e5e5; }
+
+  /* 완성본 */
+  #output-section { display: none; }
+  .output-box { background: #fff; border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .output-box h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+  .md-preview { background: #f9f9f9; border-radius: 10px; padding: 20px; font-size: 13px; font-family: 'Menlo', monospace; white-space: pre-wrap; max-height: 360px; overflow-y: auto; line-height: 1.7; color: #333; }
+  .prompt-preview { background: #f0f7ff; border-radius: 10px; padding: 20px; font-size: 14px; line-height: 1.7; color: #1d1d1f; max-height: 200px; overflow-y: auto; }
+  .copy-btn { font-size: 12px; padding: 6px 14px; border-radius: 8px; background: #f0f0f0; border: none; cursor: pointer; float: right; margin-bottom: 8px; }
+  .copy-btn:hover { background: #e0e0e0; }
+
+  .restart-btn { text-align: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span style="font-size:20px">🔍</span>
+  <h1>기획서 사전 점검 도구</h1>
+  <span class="badge">Pre-flight Checker</span>
+</div>
+
+<div class="main">
+
+  <!-- 1. 업로드 -->
+  <div id="upload-section">
+    <h2>기획서를 올려주세요</h2>
+    <p>MD 파일을 분석해서 빠진 항목을 찾아드려요</p>
+    <div class="drop-zone" id="drop-zone">
+      <div class="icon">📄</div>
+      <div class="main-text">MD 파일을 여기에 드래그하거나 클릭해서 선택</div>
+      <div class="sub-text">Markdown (.md) 파일만 지원합니다</div>
+    </div>
+    <input type="file" id="file-input" accept=".md,.txt">
+  </div>
+
+  <!-- 2. 로딩 -->
+  <div id="loading-section">
+    <div class="spinner"></div>
+    <p style="font-size:17px; font-weight:600; color:#333;">기획서를 분석하고 있어요...</p>
+    <ul class="loading-steps" id="loading-steps">
+      <li data-step="0">📋 배포 유형 파악 중...</li>
+      <li data-step="1">🏗 인프라 요구사항 확인 중...</li>
+      <li data-step="2">🔒 보안 항목 점검 중...</li>
+      <li data-step="3">🗄 데이터 관리 확인 중...</li>
+      <li data-step="4">⚡ 기술 난이도 평가 중...</li>
+      <li data-step="5">✨ 기획 완성도 분석 중...</li>
+    </ul>
+  </div>
+
+  <!-- 3. 결과 -->
+  <div id="result-section">
+    <div class="result-header">
+      <div>
+        <span id="usage-badge" class="usage-badge"></span>
+        <span id="deploy-badge" class="deploy-badge"></span>
+      </div>
+      <div class="result-summary-row">
+        <div id="result-summary" class="result-summary"></div>
+        <div id="score-circle" class="score-circle"></div>
+      </div>
+      <div id="volume-guide" class="volume-guide" style="display:none"></div>
+    </div>
+
+    <div class="sections-grid" id="sections-grid"></div>
+
+    <div class="risks-box" id="risks-box" style="display:none">
+      <h3>⚠ 주요 리스크</h3>
+      <ul id="risks-list"></ul>
+    </div>
+
+    <div class="models-box">
+      <h3>🤖 이 프로젝트에 추천하는 AI 개발 모델</h3>
+      <div class="models-grid" id="models-grid"></div>
+    </div>
+
+    <button class="btn btn-primary" id="go-complete-btn">보완 항목 입력하고 완성본 받기 →</button>
+    <button class="btn btn-secondary" onclick="restart()">다른 기획서 분석하기</button>
+  </div>
+
+  <!-- 4. 보완 입력 -->
+  <div id="complete-section">
+    <div class="form-box">
+      <h2>✏️ 빠진 항목을 채워주세요</h2>
+      <p class="desc">아래 질문들에 간단히 답하면 완성된 기획서 MD를 만들어드려요</p>
+      <div id="missing-fields"></div>
+      <button class="btn btn-primary" id="generate-btn" onclick="generateComplete()">완성본 기획서 + 프롬프트 생성하기 →</button>
+      <button class="btn btn-secondary" onclick="showResult()">← 분석 결과로 돌아가기</button>
+    </div>
+  </div>
+
+  <!-- 5. 완성본 출력 -->
+  <div id="output-section">
+    <div class="output-box">
+      <button class="copy-btn" onclick="copyText('md-preview')">복사</button>
+      <h3>📄 완성된 기획서</h3>
+      <pre class="md-preview" id="md-preview"></pre>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="downloadMD()">MD 파일 다운로드</button>
+    </div>
+
+    <div class="output-box">
+      <button class="copy-btn" onclick="copyText('prompt-preview')">복사</button>
+      <h3>🤖 AI 에이전트용 프롬프트</h3>
+      <div class="prompt-preview" id="prompt-preview"></div>
+    </div>
+
+    <div class="restart-btn">
+      <button class="btn btn-secondary" onclick="restart()">처음으로 돌아가기</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let analysisResult = null;
+let originalContent = '';
+let completedMD = '';
+
+const sectionMeta = {
+  purpose:       { icon: '🎯' },
+  infrastructure:{ icon: '🏗' },
+  security:      { icon: '🔒' },
+  data:          { icon: '🗄' },
+  complexity:    { icon: '⚡' },
+  completeness:  { icon: '📋' }
+};
+const statusLabel = { good: '양호', warning: '검토 필요', missing: '누락' };
+
+// ─── 드래그앤드롭 ───────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) readFile(e.target.files[0]);
+});
+
+function readFile(file) {
+  if (!file.name.match(/\.(md|txt)$/i)) {
+    alert('MD 파일만 지원합니다 (.md)');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    originalContent = e.target.result;
+    analyze(originalContent);
+  };
+  reader.readAsText(file);
+}
+
+// ─── 분석 ───────────────────────────────────────
+async function analyze(content) {
+  show('loading-section');
+
+  // 로딩 스텝 애니메이션
+  const steps = document.querySelectorAll('#loading-steps li');
+  let i = 0;
+  const timer = setInterval(() => {
+    if (i > 0) steps[i - 1].classList.replace('active', 'done');
+    if (i < steps.length) {
+      steps[i].classList.add('active');
+      i++;
+    } else {
+      clearInterval(timer);
+    }
+  }, 600);
+
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    analysisResult = data;
+    clearInterval(timer);
+    steps.forEach(s => { s.classList.remove('active'); s.classList.add('done'); });
+    setTimeout(() => renderResult(data), 400);
+  } catch (err) {
+    clearInterval(timer);
+    alert('분석 오류: ' + err.message);
+    show('upload-section');
+  }
+}
+
+function renderResult(data) {
+  // 활용처 배지
+  const usageLabels = {
+    personal: '👤 개인 업무 효율화',
+    team:     '👥 팀/부서 내부 도구',
+    company:  '🏢 전사 배포 서비스',
+    event:    '🎉 행사/일회성 도구',
+    product:  '🌐 외부 공개 서비스'
+  };
+  const usageBadge = document.getElementById('usage-badge');
+  usageBadge.textContent = usageLabels[data.usage_type] || data.usage_type_label || '';
+  usageBadge.className = 'usage-badge usage-' + (data.usage_type || 'personal');
+
+  // 배포 유형 배지
+  const badge = document.getElementById('deploy-badge');
+  badge.textContent = data.deploy_type_label || '유형 미정';
+  badge.className = 'deploy-badge deploy-' + (data.deploy_type || 'local');
+
+  // 볼륨 가이드
+  const vg = document.getElementById('volume-guide');
+  if (data.volume_guide) {
+    vg.style.display = 'block';
+    vg.innerHTML = `<div class="volume-guide-title">💡 적정 볼륨 가이드</div>${data.volume_guide}`;
+  } else {
+    vg.style.display = 'none';
+  }
+
+  // 요약
+  document.getElementById('result-summary').textContent = data.summary || '';
+
+  // 점수
+  const score = data.score || 0;
+  const scoreEl = document.getElementById('score-circle');
+  scoreEl.innerHTML = `${score}<div class="score-label">기획 완성도</div>`;
+  scoreEl.className = 'score-circle ' + (score >= 70 ? 'score-high' : score >= 40 ? 'score-mid' : 'score-low');
+
+  // 섹션 카드
+  const grid = document.getElementById('sections-grid');
+  grid.innerHTML = '';
+  (data.sections || []).forEach(sec => {
+    const meta = sectionMeta[sec.id] || { icon: '📌' };
+    grid.innerHTML += `
+      <div class="section-card ${sec.status}">
+        <div class="section-top">
+          <span class="section-icon">${meta.icon}</span>
+          <span class="section-name">${sec.name}</span>
+          <span class="section-status">${statusLabel[sec.status] || sec.status}</span>
+        </div>
+        <div class="section-message">${sec.message}</div>
+        ${sec.suggestion ? `<div class="section-suggestion">💡 ${sec.suggestion}</div>` : ''}
+      </div>`;
+  });
+
+  // 리스크
+  const risks = data.risks || [];
+  if (risks.length) {
+    document.getElementById('risks-box').style.display = 'block';
+    document.getElementById('risks-list').innerHTML = risks.map(r => `<li>${r}</li>`).join('');
+  }
+
+  // 추천 모델
+  const mg = document.getElementById('models-grid');
+  const rm = data.recommended_models || {};
+  mg.innerHTML = `
+    <div class="model-card">
+      <div class="model-provider">Claude (Anthropic)</div>
+      <div class="model-name">${rm.claude?.model || '-'}</div>
+      <div class="model-reason">${rm.claude?.reason || ''}</div>
+    </div>
+    <div class="model-card">
+      <div class="model-provider">OpenAI</div>
+      <div class="model-name">${rm.openai?.model || '-'}</div>
+      <div class="model-reason">${rm.openai?.reason || ''}</div>
+    </div>`;
+
+  show('result-section');
+}
+
+// ─── 보완 입력 ──────────────────────────────────
+document.getElementById('go-complete-btn').addEventListener('click', () => {
+  const missing = (analysisResult?.sections || []).filter(s => s.status !== 'good');
+  const container = document.getElementById('missing-fields');
+  container.innerHTML = '';
+
+  if (missing.length === 0) {
+    container.innerHTML = '<p style="color:#34c759;font-weight:600;margin-bottom:20px">✅ 모든 항목이 양호합니다! 바로 완성본을 생성할게요.</p>';
+  } else {
+    missing.forEach(sec => {
+      const meta = sectionMeta[sec.id] || { icon: '📌' };
+      const hasAiAnswer = sec.ai_answer && sec.ai_answer.trim();
+      container.innerHTML += `
+        <div class="form-field">
+          <label>${meta.icon} ${sec.name}</label>
+          ${sec.question ? `<div class="question">👉 ${sec.question}</div>` : ''}
+          ${hasAiAnswer ? `<div class="ai-answer-hint">🤖 <span>AI 추천 답변이 입력됐어요 — 그대로 제출하거나 직접 수정하세요</span></div>` : ''}
+          <textarea id="answer-${sec.id}">${hasAiAnswer ? sec.ai_answer : ''}</textarea>
+        </div>`;
+    });
+  }
+  show('complete-section');
+});
+
+async function generateComplete() {
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+
+  const answers = {};
+  (analysisResult?.sections || []).filter(s => s.status !== 'good').forEach(sec => {
+    const el = document.getElementById('answer-' + sec.id);
+    if (el && el.value.trim()) answers[sec.name] = el.value.trim();
+  });
+
+  try {
+    const res = await fetch('/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ original_content: originalContent, answers, analysis: analysisResult })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    completedMD = data.completed_md;
+    document.getElementById('md-preview').textContent = completedMD;
+    document.getElementById('prompt-preview').textContent = data.agent_prompt;
+    show('output-section');
+  } catch (err) {
+    alert('생성 오류: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '완성본 기획서 + 프롬프트 생성하기 →';
+  }
+}
+
+// ─── 다운로드 ────────────────────────────────────
+function downloadMD() {
+  const blob = new Blob([completedMD], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '완성된_기획서.md';
+  a.click();
+}
+
+function copyText(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent).then(() => alert('복사했습니다!'));
+}
+
+// ─── 유틸 ────────────────────────────────────────
+function show(id) {
+  ['upload-section','loading-section','result-section','complete-section','output-section']
+    .forEach(s => document.getElementById(s).style.display = s === id ? 'block' : 'none');
+}
+
+function showResult() { show('result-section'); }
+
+function restart() {
+  analysisResult = null;
+  originalContent = '';
+  completedMD = '';
+  document.getElementById('file-input').value = '';
+  document.querySelectorAll('#loading-steps li').forEach(li => li.className = '');
+  document.getElementById('risks-box').style.display = 'none';
+  show('upload-section');
+}
+</script>
+</body>
+</html>
