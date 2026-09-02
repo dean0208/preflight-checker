@@ -11,13 +11,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // 빈 포트 자동 탐색
 function findFreePort(start = 3000) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.listen(start, () => {
+    server.once('error', () => {
+      server.close();
+      findFreePort(start + 1).then(resolve).catch(reject);
+    });
+    server.once('listening', () => {
       const port = server.address().port;
       server.close(() => resolve(port));
     });
-    server.on('error', () => resolve(findFreePort(start + 1)));
+    server.listen(start);
   });
 }
 
